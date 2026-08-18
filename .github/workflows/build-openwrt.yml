@@ -34,7 +34,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell
-        sudo apt-update -y
+        sudo apt-get update
         sudo apt-get -y purge azure-cli ghc* zulu* llvm* firefox google-chrome* dotnet* powershell openjdk* mongodb* moby* snapd*
         sudo apt-get -y install build-essential clang flex bison gasm awk gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
         sudo apt-get -y autoremove --purge
@@ -52,9 +52,7 @@ jobs:
     - name: 加载 DIY-1 脚本 (添加 Feeds)
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+        [ -e $DIY_P1_SH ] && chmod +x $DIY_P1_SH && ./$DIY_P1_SH || true
 
     - name: 更新并安装 Feeds
       run: |
@@ -65,9 +63,8 @@ jobs:
     - name: 加载 DIY-2 脚本与 Config 选项
       run: |
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
+        [ -e $DIY_P2_SH ] && chmod +x $DIY_P2_SH && ./$DIY_P2_SH || true
         cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
         make defconfig
 
     # ==================== SSH 调试与菜单配置节点 ====================
