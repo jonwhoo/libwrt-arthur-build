@@ -1,8 +1,14 @@
-name: Build LibWrt for JDC Arthur
+name: Build LibWrt for JDC Arthur (with SSH Menuconfig)
 
 on:
   repository_dispatch:
   workflow_dispatch:
+    inputs:
+      ssh:
+        description: '是否开启 SSH 接入进行 make menuconfig 调整'
+        required: false
+        type: boolean
+        default: true
 
 env:
   REPO_URL: https://github.com/LiBwrt/LibWrt
@@ -40,7 +46,6 @@ jobs:
     - name: 克隆 LibWrt 源码
       working-directory: /workdir
       run: |
-        df -h
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
@@ -64,6 +69,14 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         make defconfig
+
+    # ==================== SSH 调试与菜单配置节点 ====================
+    - name: 开启 SSH 终端进行 menuconfig 配置
+      uses: mxschmitt/action-tmate@v3
+      if: (github.event.inputs.ssh == 'true' || contains(github.event.action, 'ssh'))
+      with:
+        limit-access-to-actor: false
+    # ================================================================
 
     - name: 下载源码依赖包 (Make Download)
       id: package
