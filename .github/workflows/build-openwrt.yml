@@ -44,10 +44,10 @@ jobs:
         sudo chown $USER:$GROUPS /workdir
 
 - name: 克隆 LibWrt 源码
-      working-directory: /workdir
-      run: |
-        git clone --depth 1 $REPO_URL openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+   working-directory: /workdir
+   run: |
+     git clone --depth 1 $REPO_URL openwrt
+     ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载 DIY-1 脚本 (添加 Feeds)
       run: |
