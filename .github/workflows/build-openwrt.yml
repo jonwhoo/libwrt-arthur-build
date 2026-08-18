@@ -11,7 +11,8 @@ on:
         default: true
 
 env:
-  REPO_URL: https://github.com/LiBwrt/LibWrt
+  REPO_URL: https://github.com/LiBwrt/LibWrt.git
+  REPO_BRANCH: 25.12-nss
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: arthur.config
   DIY_P1_SH: diy-part1.sh
@@ -42,10 +43,10 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆 LibWrt 源码
+    - name: 克隆 LibWrt 源码 (25.12-nss 分支)
       working-directory: /workdir
       run: |
-        git clone --depth 1 $REPO_URL openwrt
+        git clone -b $REPO_BRANCH --depth 1 --single-branch $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载 DIY-1 脚本 (添加 Feeds)
