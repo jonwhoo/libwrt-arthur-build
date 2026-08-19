@@ -33,6 +33,7 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list
         sudo -E apt-get update
         sudo -E apt-get install -y --no-install-recommends \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
