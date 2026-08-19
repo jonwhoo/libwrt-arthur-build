@@ -1,135 +1,642 @@
-name: Build OpenWrt Firmware
+name: Build LiBwrt 25.12-nss - JDC Arthur
 
 on:
-  repository_dispatch:
   workflow_dispatch:
     inputs:
       ssh:
-        description: '是否开启 SSH 接入进行 menuconfig 调整'
+        description: '开启 SSH 接入，可使用 menuconfig 调整配置'
         required: false
         type: boolean
         default: false
 
+  repository_dispatch:
+
+  push:
+    paths:
+      - 'arthur.config'
+      - 'feeds.conf.default'
+      - 'diy-part1.sh'
+      - 'diy-part2.sh'
+      - '.github/workflows/build.yml'
+
 env:
   REPO_URL: https://github.com/LiBwrt/LibWrt.git
-  REPO_BRANCH: 25.12-nss                          # <-- 必须指定 25.12-nss 分支
+  REPO_BRANCH: 25.12-nss
+
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: arthur.config                       # 确保你仓库根目录下有该 config 文件
+  CONFIG_FILE: arthur.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
+
   UPLOAD_ARTIFACT: true
   UPLOAD_RELEASE: true
+
   TZ: Asia/Shanghai
 
+  DEBIAN_FRONTEND: noninteractive
+
 jobs:
+
   build:
+
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 检查代码仓库
+
+    # ========================================================
+    # Checkout build configuration repository
+    # ========================================================
+
+    - name: Checkout build configuration
       uses: actions/checkout@v4
 
-    - name: 初始化编译环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo -E apt-get -o Acquire::http::Timeout="30" -o Acquire::Retries="3" update
-        sudo -E apt-get install -y --no-install-recommends \
-          -o Acquire::http::Timeout="30" -o Acquire::Retries="3" \
-          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
-          gcc-multilib g++-multilib git haveged intltool lib32gcc-s1 libc6-dev-i386 \
-          libglib2.0-dev libgmp3-dev libpostproc-dev libltdl-dev libmpc-dev libmpfr-dev \
-          libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
-          msmtp nano ninja-build pnetcdf-bin python3 python3-pip python3-ply \
-          python3-docutils python3-pyelftools qemu-utils rsync subversion texinfo \
-          u-boot-tools unzip xmlto xz-utils zlib1g-dev zstd
-        sudo -E apt-get autoremove --purge
-        sudo -E apt-get clean
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆 LibWrt 源码
+    # ========================================================
+    # Initialize build environment
+    # ========================================================
+
+    - name: Initialize build environment
+      run: |
+
+        echo "============================================================"
+        echo " Installing OpenWrt build dependencies"
+        echo "============================================================"
+
+        sudo apt-get \
+          -o Acquire::Retries=3 \
+          -o Acquire::http::Timeout=30 \
+          -o Acquire::https::Timeout=30 \
+          update
+
+        sudo apt-get install -y \
+          --no-install-recommends \
+          -o Acquire::Retries=3 \
+          -o Acquire::http::Timeout=30 \
+          -o Acquire::https::Timeout=30 \
+          ack \
+          asciidoc \
+          autoconf \
+          automake \
+          autopoint \
+          binutils \
+          bison \
+          build-essential \
+          bzip2 \
+          ccache \
+          cmake \
+          cpio \
+          curl \
+          device-tree-compiler \
+          fastjar \
+          flex \
+          gawk \
+          gettext \
+          git \
+          gperf \
+          haveged \
+          intltool \
+          libglib2.0-dev \
+          libgmp3-dev \
+          libltdl-dev \
+          libmpc-dev \
+          libmpfr-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libreadline-dev \
+          libssl-dev \
+          libtool \
+          nano \
+          ninja-build \
+          python3 \
+          python3-pip \
+          python3-ply \
+          python3-docutils \
+          python3-pyelftools \
+          qemu-utils \
+          rsync \
+          subversion \
+          swig \
+          texinfo \
+          unzip \
+          xmlto \
+          xz-utils \
+          zlib1g-dev \
+          zstd
+
+        sudo timedatectl set-timezone "$TZ"
+
+        echo
+        echo ">>> Tool versions"
+
+        git --version
+        gcc --version | head -1
+        make --version | head -1
+        python3 --version
+
+        echo
+        echo ">>> CPU"
+
+        nproc
+
+        echo
+        echo ">>> Memory"
+
+        free -h
+
+
+    # ========================================================
+    # Prepare working directory
+    # ========================================================
+
+    - name: Prepare working directory
+      run: |
+
+        sudo mkdir -p /workdir
+
+        sudo chown \
+          "$USER:$USER" \
+          /workdir
+
+        mkdir -p /workdir/openwrt
+
+
+    # ========================================================
+    # Clone LibWrt
+    # ========================================================
+
+    - name: Clone LibWrt 25.12-nss
       working-directory: /workdir
       run: |
-        git clone -b $REPO_BRANCH --depth 1 $REPO_URL openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 缓存 OpenWrt 编译依赖 (dl & ccache)
+        echo "============================================================"
+        echo " Cloning LiBwrt/LibWrt"
+        echo " Branch: $REPO_BRANCH"
+        echo "============================================================"
+
+        git clone \
+          --depth 1 \
+          --single-branch \
+          --branch "$REPO_BRANCH" \
+          "$REPO_URL" \
+          openwrt
+
+        cd openwrt
+
+        echo
+        echo ">>> Commit:"
+        git log -1 --oneline
+
+        echo
+        echo ">>> Branch:"
+        git branch --show-current
+
+        echo
+        echo ">>> Target tree:"
+        ls -la target/linux/qualcommax/
+
+
+    # ========================================================
+    # Link OpenWrt directory to workspace
+    # ========================================================
+
+    - name: Link OpenWrt source
+      run: |
+
+        ln -sfn \
+          /workdir/openwrt \
+          "$GITHUB_WORKSPACE/openwrt"
+
+        ls -ld "$GITHUB_WORKSPACE/openwrt"
+
+
+    # ========================================================
+    # Install feeds configuration BEFORE cache
+    # ========================================================
+
+    - name: Prepare feeds configuration
+      run: |
+
+        cp \
+          "$FEEDS_CONF" \
+          openwrt/feeds.conf.default
+
+        echo
+        echo ">>> feeds.conf.default"
+
+        cat openwrt/feeds.conf.default
+
+
+    # ========================================================
+    # Cache download directory and ccache
+    # ========================================================
+
+    - name: Cache OpenWrt downloads and ccache
       uses: actions/cache@v4
+
       with:
+
         path: |
-          openwrt/dl
-          openwrt/staging_dir/host
-          openwrt/staging_dir/toolchain
-        key: ${{ runner.os }}-openwrt-${{ hashFiles('openwrt/feeds.conf.default') }}-${{ github.sha }}
+          /workdir/openwrt/dl
+          ~/.ccache
+
+        key: |
+          ${{ runner.os }}-libwrt-25.12-nss-${{ hashFiles('feeds.conf.default', 'arthur.config', 'diy-part1.sh', 'diy-part2.sh') }}
+
         restore-keys: |
-          ${{ runner.os }}-openwrt-${{ hashFiles('openwrt/feeds.conf.default') }}-
-          ${{ runner.os }}-openwrt-
+          ${{ runner.os }}-libwrt-25.12-nss-
 
-    - name: 加载 DIY-1 脚本 (添加 Feeds)
-      run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/
-        [ -e $DIY_P1_SH ] && chmod +x $DIY_P1_SH && ./$DIY_P1_SH || true
 
-    - name: 更新并安装 Feeds
+    # ========================================================
+    # Enable ccache
+    # ========================================================
+
+    - name: Configure ccache
       run: |
+
+        mkdir -p ~/.ccache
+
+        ccache --set-config=max_size=5G
+        ccache --set-config=compression=true
+
+        echo
+        ccache --show-config
+
+        echo
+        ccache --zero-stats
+
+
+    # ========================================================
+    # DIY Part 1
+    # ========================================================
+
+    - name: Run DIY Part 1
+      run: |
+
+        chmod +x "$DIY_P1_SH"
+
+        "./$DIY_P1_SH"
+
+
+    # ========================================================
+    # Copy custom configuration
+    # ========================================================
+
+    - name: Load Arthur configuration
+      run: |
+
+        echo ">>> Installing arthur.config"
+
+        cp \
+          "$CONFIG_FILE" \
+          openwrt/.config
+
+        echo
+        echo ">>> Initial Target configuration"
+
+        grep -E \
+          '^CONFIG_TARGET_' \
+          openwrt/.config \
+          | head -30 || true
+
+
+    # ========================================================
+    # DIY Part 2
+    # ========================================================
+
+    - name: Run DIY Part 2
+      run: |
+
+        chmod +x "$DIY_P2_SH"
+
+        "./$DIY_P2_SH"
+
+
+    # ========================================================
+    # Generate final configuration
+    # ========================================================
+
+    - name: Generate final OpenWrt configuration
+      run: |
+
         cd openwrt
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
 
-    - name: 加载 DIY-2 脚本与 Config 选项
-      run: |
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        [ -e $DIY_P2_SH ] && chmod +x $DIY_P2_SH && ./$DIY_P2_SH || true
-        cd openwrt
+        echo "============================================================"
+        echo " Running make defconfig"
+        echo "============================================================"
+
         make defconfig
 
-    - name: 开启 SSH 终端进行 menuconfig 配置
+        echo
+        echo "============================================================"
+        echo " FINAL TARGET"
+        echo "============================================================"
+
+        grep -E \
+          '^CONFIG_TARGET_' \
+          .config \
+          | grep -E \
+          'TARGET_qualcommax|TARGET_DEVICE' \
+          || true
+
+        echo
+        echo "============================================================"
+        echo " FINAL PROXY PACKAGES"
+        echo "============================================================"
+
+        grep -E \
+          '^CONFIG_PACKAGE_luci-app-(openclash|ssr-plus|passwall)' \
+          .config \
+          || true
+
+        echo
+        echo "============================================================"
+        echo " FINAL NSS PACKAGES"
+        echo "============================================================"
+
+        grep -E \
+          'nss|NSS' \
+          .config \
+          | grep '^CONFIG_PACKAGE_' \
+          | head -50 \
+          || true
+
+        echo
+        echo "============================================================"
+        echo " CONFIG CHECK"
+        echo "============================================================"
+
+        echo "Target:"
+        grep \
+          '^CONFIG_TARGET_qualcommax=y' \
+          .config
+
+        echo "Subtarget:"
+        grep \
+          '^CONFIG_TARGET_qualcommax_ipq60xx=y' \
+          .config
+
+        echo "Arthur:"
+        grep \
+          '^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_jdcloud_re-ss-01=y' \
+          .config
+
+        echo "OpenClash:"
+        grep \
+          '^CONFIG_PACKAGE_luci-app-openclash=y' \
+          .config
+
+        echo "SSR Plus:"
+        grep \
+          '^CONFIG_PACKAGE_luci-app-ssr-plus=y' \
+          .config
+
+        echo "PassWall:"
+        grep \
+          '^CONFIG_PACKAGE_luci-app-passwall=y' \
+          .config
+
+
+    # ========================================================
+    # SSH menuconfig
+    # ========================================================
+
+    - name: SSH menuconfig
       uses: P3TERX/ssh2actions@main
-      if: (github.event.inputs.ssh == 'true' || github.event.inputs.ssh == 'true') && !cancelled()
+
+      if: inputs.ssh && !cancelled()
+
       env:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
-    - name: 下载源码依赖包 (Make Download)
+
+    # ========================================================
+    # Download source packages
+    # ========================================================
+
+    - name: Download source packages
       id: package
+
       run: |
+
         cd openwrt
+
+        echo "============================================================"
+        echo " Downloading OpenWrt source packages"
+        echo "============================================================"
+
         make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -rf {} \;
 
-    - name: 编译固件
+        echo
+        echo ">>> Checking incomplete downloads"
+
+        find dl \
+          -size -1024c \
+          -exec ls -lh {} \; \
+          || true
+
+        find dl \
+          -size -1024c \
+          -delete
+
+        echo
+        echo ">>> Download completed"
+
+
+    # ========================================================
+    # Compile firmware
+    # ========================================================
+
+    - name: Compile firmware
       id: compile
+
       run: |
+
         cd openwrt
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) FORCE_UNSAFE_CONFIGURE=1 || make -j1 V=s FORCE_UNSAFE_CONFIGURE=1
-        echo "status=success" >> $GITHUB_OUTPUT
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: 整理编译产物
-      id: organize
-      if: steps.compile.outputs.status == 'success' && !cancelled()
+        THREADS="$(nproc)"
+
+        echo "============================================================"
+        echo " Compiling LiBwrt"
+        echo " Threads: $THREADS"
+        echo " Target: JDC Arthur"
+        echo "============================================================"
+
+        make -j"$THREADS" \
+          V=s \
+          FORCE_UNSAFE_CONFIGURE=1
+
+        echo "status=success" >> "$GITHUB_OUTPUT"
+
+        echo \
+          "FILE_DATE=_$(date '+%Y%m%d%H%M')" \
+          >> "$GITHUB_ENV"
+
+
+    # ========================================================
+    # ccache statistics
+    # ========================================================
+
+    - name: Show ccache statistics
+      if: always()
+
       run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 上传固件至 Artifacts
+        echo "============================================================"
+        echo " ccache statistics"
+        echo "============================================================"
+
+        ccache --show-stats || true
+
+
+    # ========================================================
+    # Verify build output
+    # ========================================================
+
+    - name: Verify firmware output
+      id: verify
+
+      if: steps.compile.outputs.status == 'success'
+
+      run: |
+
+        cd openwrt
+
+        echo "============================================================"
+        echo " Firmware output"
+        echo "============================================================"
+
+        find bin/targets \
+          -type f \
+          \( \
+            -name '*.bin' \
+            -o -name '*.img' \
+            -o -name '*.ubi' \
+            -o -name '*.itb' \
+            -o -name '*.tar' \
+            -o -name '*.gz' \
+          \) \
+          -printf '%p %s bytes\n' \
+          | sort
+
+        echo
+        echo ">>> Target directory"
+
+        find bin/targets \
+          -maxdepth 3 \
+          -type d \
+          -print
+
+
+    # ========================================================
+    # Organize firmware
+    # ========================================================
+
+    - name: Organize firmware
+      id: organize
+
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+
+      run: |
+
+        cd openwrt
+
+        TARGET_DIR="$(find bin/targets -mindepth 2 -maxdepth 2 -type d | head -1)"
+
+        if [ -z "$TARGET_DIR" ]; then
+          echo "[ERROR] Firmware target directory not found"
+          exit 1
+        fi
+
+        echo "Firmware directory:"
+        echo "$TARGET_DIR"
+
+        rm -rf "$TARGET_DIR/packages"
+
+        echo \
+          "FIRMWARE=$GITHUB_WORKSPACE/$TARGET_DIR" \
+          >> "$GITHUB_ENV"
+
+        echo "status=success" >> "$GITHUB_OUTPUT"
+
+        echo
+        echo ">>> Final firmware files"
+
+        find "$TARGET_DIR" \
+          -maxdepth 1 \
+          -type f \
+          -printf '%f %s bytes\n' \
+          | sort
+
+
+    # ========================================================
+    # Upload Artifact
+    # ========================================================
+
+    - name: Upload firmware Artifact
+
       uses: actions/upload-artifact@v4
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_ARTIFACT == 'true' && !cancelled()
-      with:
-        name: Lean_OpenWrt_${{ github.run_id }}
-        path: ${{ env.FIRMWARE }}
 
-    - name: 发布至 GitHub Release
-      uses: softprops/action-gh-release@v2
-      if: steps.organize.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: |
+        steps.organize.outputs.status == 'success' &&
+        env.UPLOAD_ARTIFACT == 'true' &&
+        !cancelled()
+
       with:
-        tag_name: Lean_OpenWrt_${{ github.run_id }}
-        files: ${{ env.FIRMWARE }}/*
+
+        name: |
+          JDC-Arthur-LiBwrt-25.12-nss-${{ github.run_id }}
+
+        path: |
+          ${{ env.FIRMWARE }}/*
+
+        if-no-files-found: error
+
+        retention-days: 14
+
+
+    # ========================================================
+    # Release
+    # ========================================================
+
+    - name: Publish GitHub Release
+
+      uses: softprops/action-gh-release@v2
+
+      if: |
+        steps.organize.outputs.status == 'success' &&
+        env.UPLOAD_RELEASE == 'true' &&
+        !cancelled()
+
+      with:
+
+        tag_name: |
+          JDC-Arthur-LiBwrt-25.12-nss-${{ github.run_id }}
+
+        name: |
+          JDC Arthur LiBwrt 25.12-nss ${{ env.FILE_DATE }}
+
+        body: |
+          ## JDC Arthur / JDCloud RE-SS-01
+
+          - Source: LiBwrt/LibWrt
+          - Branch: 25.12-nss
+          - Target: qualcommax/ipq60xx
+          - Device: jdcloud_re-ss-01
+          - NSS: enabled by target
+          - OpenClash: enabled
+          - SSR Plus+: enabled
+          - PassWall: enabled
+          - Sing-box: enabled
+          - Xray: enabled
+          - ShadowsocksR Libev Client: enabled
+          - Default LAN IP: 192.168.2.1
+          - Hostname: JDC-Arthur
+
+          Build ID:
+          ${{ github.run_id }}
+
+        files: |
+          ${{ env.FIRMWARE }}/*
+
         token: ${{ secrets.GITHUB_TOKEN }}
