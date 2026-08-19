@@ -74,10 +74,11 @@ jobs:
         make defconfig
 
     - name: 开启 SSH 终端进行 menuconfig 配置
-      uses: mxschmitt/action-tmate@v3
-      if: (github.event.inputs.ssh == 'true' || contains(github.event.action, 'ssh'))
-      with:
-        limit-access-to-actor: false
+      uses: P3TERX/ssh2actions@main
+      if: (github.event.inputs.ssh == 'true' || github.event.inputs.ssh == 'true') && !cancelled()
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
     - name: 下载源码依赖包 (Make Download)
       id: package
@@ -92,8 +93,9 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) V=s || make -j1 V=s
+        make -j$(nproc) FORCE_UNSAFE_CONFIGURE=1 || make -j1 V=s FORCE_UNSAFE_CONFIGURE=1
         echo "status=success" >> $GITHUB_OUTPUT
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: 整理编译产物
       id: organize
