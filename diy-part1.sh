@@ -1,21 +1,166 @@
 #!/bin/bash
+
 #
-# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
+# ============================================================
+# LiBwrt 25.12-nss
+# JDC Arthur / JDCloud RE-SS-01
 #
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-# File name: diy-part1.sh
-# Description: OpenWrt DIY script part 1 (Before Update feeds)
+# DIY Part 1
+# Before feeds update/install
+# ============================================================
 #
 
-# Uncomment a feed source
-sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
+set -e
 
-# Add feed sources
-echo 'src-git openclash https://github.com/vernesong/OpenClash.git' >>feeds.conf.default
+echo "============================================================"
+echo " DIY Part 1"
+echo " LiBwrt 25.12-nss / JDC Arthur"
+echo "============================================================"
 
-# 添加 Passwall 核心依赖包仓库 + 主程序仓库
-echo 'src-git passwall_packages https://github.com/xiaorouji/openwrt-passwall-packages.git' >>feeds.conf.default
-echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall.git' >>feeds.conf.default
+cd "$GITHUB_WORKSPACE/openwrt"
+
+echo
+echo ">>> OpenWrt source:"
+git remote -v | head -2
+
+echo
+echo ">>> OpenWrt branch:"
+git branch --show-current || true
+
+#
+# ============================================================
+# Update official feeds
+# ============================================================
+#
+
+echo
+echo ">>> Updating official feeds..."
+
+./scripts/feeds update -a
+
+echo
+echo ">>> Installing official feeds..."
+
+./scripts/feeds install -a
+
+
+#
+# ============================================================
+# Replace official proxy cores with sbwml maintained versions
+# ============================================================
+#
+
+echo
+echo ">>> Removing duplicate upstream proxy cores..."
+
+rm -rf feeds/packages/net/xray-core
+rm -rf feeds/packages/net/v2ray-core
+rm -rf feeds/packages/net/v2ray-geodata
+rm -rf feeds/packages/net/sing-box
+
+
+#
+# ============================================================
+# Replace Golang toolchain
+#
+# sbwml/openwrt_helloworld recommends its packages_lang_golang
+# 23.x branch for this package set.
+# ============================================================
+#
+
+echo
+echo ">>> Installing sbwml Golang 1.23 feed..."
+
+rm -rf feeds/packages/lang/golang
+
+git clone \
+    --depth 1 \
+    -b 23.x \
+    https://github.com/sbwml/packages_lang_golang.git \
+    feeds/packages/lang/golang
+
+
+#
+# ============================================================
+# Clone sbwml OpenWrt extra packages
+#
+# IMPORTANT:
+# Do NOT use scripts/feeds for this repository.
+# The upstream README recommends package/helloworld directly.
+# ============================================================
+#
+
+echo
+echo ">>> Cloning sbwml/openwrt_helloworld..."
+
+rm -rf package/helloworld
+
+git clone \
+    --depth 1 \
+    https://github.com/sbwml/openwrt_helloworld.git \
+    package/helloworld
+
+
+#
+# ============================================================
+# Verify required applications
+# ============================================================
+#
+
+echo
+echo "============================================================"
+echo " Verifying proxy packages"
+echo "============================================================"
+
+for pkg in \
+    luci-app-openclash \
+    luci-app-ssr-plus \
+    luci-app-passwall
+do
+    if [ -d "package/helloworld/$pkg" ]; then
+        echo "[OK] $pkg"
+    else
+        echo "[ERROR] Missing package/helloworld/$pkg"
+        exit 1
+    fi
+done
+
+
+#
+# ============================================================
+# Verify required proxy cores
+# ============================================================
+#
+
+echo
+echo ">>> Verifying proxy cores..."
+
+for pkg in \
+    mihomo-meta \
+    xray-core \
+    sing-box \
+    shadowsocksr-libev \
+    chinadns-ng
+do
+    if [ -d "package/helloworld/$pkg" ]; then
+        echo "[OK] $pkg"
+    else
+        echo "[WARN] $pkg directory not found"
+    fi
+done
+
+
+#
+# ============================================================
+# Display feeds
+# ============================================================
+#
+
+echo
+echo ">>> feeds.conf.default:"
+cat feeds.conf.default
+
+echo
+echo "============================================================"
+echo " DIY Part 1 completed successfully"
+echo "============================================================"
