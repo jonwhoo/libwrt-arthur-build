@@ -33,8 +33,9 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo -E apt-get update
+        sudo -E apt-get -o Acquire::http::Timeout="30" -o Acquire::Retries="3" update
         sudo -E apt-get install -y --no-install-recommends \
+          -o Acquire::http::Timeout="30" -o Acquire::Retries="3" \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
           bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
           gcc-multilib g++-multilib git haveged intltool lib32gcc-s1 libc6-dev-i386 \
