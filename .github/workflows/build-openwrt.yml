@@ -1,20 +1,20 @@
-name: Build LibWrt for JDC Arthur (with SSH Menuconfig)
+name: Build OpenWrt Firmware
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
       ssh:
-        description: '是否开启 SSH 接入进行 make menuconfig 调整'
+        description: '是否开启 SSH 接入进行 menuconfig 调整'
         required: false
         type: boolean
         default: false
 
 env:
-  REPO_URL: https://github.com/LiBwrt/LibWrt.git
-  REPO_BRANCH: 25.12-nss
+  REPO_URL: https://github.com/coolsnowwolf/lede.git
+  REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: arthur.config
+  CONFIG_FILE: x86_64.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_ARTIFACT: true
@@ -33,18 +33,19 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install -y build-essential clang flex bison gawk gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+        sudo -E apt-get -qq install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git git-core haveged intltool lib32gcc-s1 libc6-dev-i386 libglib2.0-dev libgmp3-dev libpostproc-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build pchtml pnetcdf-bin python2.7 python3 python3-pip python3-ply python3-docutils python3-pyelftools qemu-utils rsync subversion swat texinfo u-boot-tools unlink unzip xmlto xz-utils zlib1g-dev zstd
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆 LibWrt 源码 (25.12-nss 分支)
+    - name: 克隆 Lean lede 源码
       working-directory: /workdir
       run: |
-        git clone -b $REPO_BRANCH --depth 1 --single-branch $REPO_URL openwrt
+        git clone -b $REPO_BRANCH --depth 1 $REPO_URL openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载 DIY-1 脚本 (添加 Feeds)
@@ -65,13 +66,11 @@ jobs:
         cd openwrt
         make defconfig
 
-    # ==================== SSH 调试与菜单配置节点 ====================
     - name: 开启 SSH 终端进行 menuconfig 配置
       uses: mxschmitt/action-tmate@v3
       if: (github.event.inputs.ssh == 'true' || contains(github.event.action, 'ssh'))
       with:
         limit-access-to-actor: false
-    # ================================================================
 
     - name: 下载源码依赖包 (Make Download)
       id: package
@@ -81,7 +80,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -rf {} \;
 
-- name: 编译固件
+    - name: 编译固件
       id: compile
       run: |
         cd openwrt
@@ -102,13 +101,13 @@ jobs:
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && env.UPLOAD_ARTIFACT == 'true' && !cancelled()
       with:
-        name: LibWrt_JDC_Arthur_${{ github.run_id }}
+        name: Lean_OpenWrt_${{ github.run_id }}
         path: ${{ env.FIRMWARE }}
 
     - name: 发布至 GitHub Release
       uses: softprops/action-gh-release@v2
       if: steps.organize.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        tag_name: JDC_Arthur_${{ github.run_id }}
+        tag_name: Lean_OpenWrt_${{ github.run_id }}
         files: ${{ env.FIRMWARE }}/*
         token: ${{ secrets.GITHUB_TOKEN }}
