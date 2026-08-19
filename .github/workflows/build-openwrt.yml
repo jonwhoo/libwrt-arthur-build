@@ -366,9 +366,9 @@ jobs:
         echo "============================================================"
 
         echo "Target:"
-        grep \
-          '^CONFIG_TARGET_qualcommax=y' \
-          .config
+       grep \
+         '^CONFIG_TARGET_qualcommax=y' \
+         .config
 
         echo "Subtarget:"
         grep \
@@ -376,9 +376,22 @@ jobs:
           .config
 
         echo "Arthur:"
-        grep \
-          '^CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_jdcloud_re-ss-01=y' \
-          .config
+        grep -E \
+          '^CONFIG_TARGET_DEVICE_.*(jdcloud|re-ss|arthur)' \
+          .config \
+          || true
+
+        echo
+        echo "============================================================"
+        echo " Available JDC / Arthur device definitions"
+        echo "============================================================"
+
+        grep -RniE \
+          'jdcloud|re-ss|arthur|AX1800|ax1800' \
+          target/linux/qualcommax \
+          2>/dev/null \
+          | head -100 \
+          || true
 
         echo "OpenClash:"
         grep \
