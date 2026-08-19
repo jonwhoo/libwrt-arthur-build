@@ -11,10 +11,10 @@ on:
         default: false
 
 env:
-  REPO_URL: https://github.com/LiBwrt/LibWrt.git   # 1. 改为 LibWrt 仓库地址
-  REPO_BRANCH: main                               # 2. 改为 LibWrt 的默认分支（通常是 main）
+  REPO_URL: https://github.com/LiBwrt/LibWrt.git
+  REPO_BRANCH: main
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: arthur.config                      # 3. 如果编译 JDC 亚瑟，改为你的 arthur.config
+  CONFIG_FILE: arthur.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_ARTIFACT: true
@@ -50,7 +50,7 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆 Lean lede 源码
+    - name: 克隆 LibWrt 源码
       working-directory: /workdir
       run: |
         git clone -b $REPO_BRANCH --depth 1 $REPO_URL openwrt
